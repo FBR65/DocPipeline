@@ -8,6 +8,9 @@ Stufe 4 (Rechenprüfung) und Stufe 5 (Musterprüfung je Label) sind **nicht**
 Teil dieses Auftrags; das ist die Entscheidung des Auftraggebers, keine Kürzung
 durch den Bearbeiter.
 
+> Alle Beträge, Namen, Anschriften und Datumsangaben in diesem Dokument sind
+> anonymisiert: Zeichenform und Stellen bleiben erhalten, die Werte sind ersetzt.
+
 ## 1. Gemessene Grundlage
 
 Eine Seite (Steuerbescheid, kein Textlayer), gleiche Datei, gleiche Maschine:

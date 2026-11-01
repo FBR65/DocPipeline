@@ -11,7 +11,7 @@ from docpipeline.dual.values import normalize_value
     ("raw", "expected"),
     [
         ("432,00 4", "432.00"),
-        ("87,00 101", "98.00"),
+        ("87,00 101", "87.00"),
         ("432.00\n4.00", "432.00"),
         ("1 428,50", "1428.50"),
         ("Euro 1.428,50 EUR", "1428.50"),
@@ -38,4 +38,4 @@ def test_text_with_little_numbers_stays_text(text: str) -> None:
 def test_short_text_with_one_number_is_numeric() -> None:
     assert normalize_value("A211") == "211"
     assert normalize_value("B421") == "421"
-    assert normalize_value("12/345/67890") == "079"
+    assert normalize_value("12/345/67890") == "12"

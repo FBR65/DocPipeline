@@ -6,6 +6,9 @@ Basis: `DocPipeline` (Repo `FBR65/DocPipeline`). Dieses Dokument beschreibt ein
 neues System auf demselben Kern: zwei OCR-Engines je Seite, Abgleich der
 Treffer, Marker für Übereinstimmung, optional Nachlesen von Zahlenregionen.
 
+> Alle Beträge, Namen, Anschriften und Datumsangaben in diesem Dokument sind
+> anonymisiert: Zeichenform und Stellen bleiben erhalten, die Werte sind ersetzt.
+
 ## 1. Gemessene Grundlage (nicht angenommen)
 
 Gleicher Endpunkt `http://127.0.0.1:8080/v1`. Zwei Messungen: eine Artikelseite

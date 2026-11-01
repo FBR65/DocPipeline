@@ -85,7 +85,10 @@ def test_value_not_in_any_box_is_reported_with_value() -> None:
 def test_box_for_plain_text_is_still_found() -> None:
     engine = Reader("Finanzamt Musterstadt")
     entities, _ = verify_entities(
-        [_entity("Finanzamt Musterstadt", "finanzamt musterstadt")], _boxes(), lambda p, b: b"PNG", engine
+        [_entity("Finanzamt Musterstadt", "finanzamt musterstadt")],
+        _boxes(),
+        lambda p, b: b"PNG",
+        engine,
     )
     assert entities[0].verified is True
 

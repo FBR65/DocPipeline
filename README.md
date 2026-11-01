@@ -329,7 +329,9 @@ tests. The result is sobering and is therefore part of the documentation:
 | date | 01.02.2024 | 03.04.2025 | 02.03.2024 |
 | recognised numbers (all pages) | 30 | 6 | 5 |
 
-The intersection of numeric values is **empty for every pair of readers**:
+All amounts, names and dates in this section are anonymised: the shape of the
+values is kept, the values themselves are replaced. The intersection of numeric
+values is **empty for every pair of readers**:
 paddle ∩ dots = 0, paddle ∩ rapid = 0, dots ∩ rapid = 0. On this document the
 readers do not merely write the same number differently — they read different
 digits. No voting rule can produce a majority from that, and none is claimed to.

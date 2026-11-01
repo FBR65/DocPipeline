@@ -22,7 +22,7 @@ DOTS_ANSWER = [
             "<tr><td>erstellt</td><td>01.2-24</td></tr></table>"
         ),
     },
-    {"bbox": [345, 601, 494, 617], "category": "Text", "text": "Bescheid für 2003"},
+    {"bbox": [345, 601, 494, 617], "category": "Text", "text": "Bescheid für 1999"},
 ]
 
 OTS_ANSWER = (
@@ -36,7 +36,7 @@ def test_parse_dots_text_excludes_markup() -> None:
     page = parse_dots(DOTS_ANSWER, page_no=1)
     assert isinstance(page, OcrPage)
     assert "Finanzamt Musterstadt" in page.text
-    assert "Bescheid für 2003" in page.text
+    assert "Bescheid für 1999" in page.text
     assert "PO 4711" in page.text
     assert "<table>" not in page.text
     assert "<td>" not in page.text
