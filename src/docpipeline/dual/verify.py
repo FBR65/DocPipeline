@@ -8,7 +8,7 @@ from collections.abc import Callable, Mapping, Sequence
 from docpipeline.dedup import normalize
 from docpipeline.dual.engines import OcrEngine
 from docpipeline.dual.formats import Element, OcrPage, html_to_text
-from docpipeline.dual.values import normalize_value
+from docpipeline.dual.values import normalize_value, number_key
 from docpipeline.errors import OcrError
 from docpipeline.records import Entity
 
@@ -49,8 +49,8 @@ def verify_entities(
             warnings.append(f"verify_skipped:{entity.label}:{entity.page}:{entity.text}")
             verified.append(entity.model_copy(update={"verified": None}))
             continue
-        target = entity.normalized or normalize_value(entity.text)
-        observed = {normalize_value(number) for number in _NUMBER.findall(answer.text)}
+        target = number_key(entity.normalized or entity.text)
+        observed = {number_key(number) for number in _NUMBER.findall(answer.text)}
         if target and target in observed:
             verified.append(entity.model_copy(update={"verified": True}))
             continue
@@ -71,7 +71,7 @@ def _find_box(boxes: Sequence[Element], entity: Entity) -> Element | None:
     Die Layout-Engine legt ganze Tabellen in ein Element mit HTML. Deshalb wird
     jede Zahl im Element geprüft, nicht nur die erste.
     """
-    target = entity.normalized or normalize_value(entity.text)
+    target = number_key(entity.normalized or entity.text)
     for box in boxes:
         if box.text and _contains_value(box.text, target):
             return box
@@ -85,4 +85,4 @@ def _find_box(boxes: Sequence[Element], entity: Entity) -> Element | None:
 def _contains_value(text: str, target: str) -> bool:
     if not target:
         return False
-    return any(normalize_value(number) == target for number in _NUMBER.findall(text))
+    return any(number_key(number) == target for number in _NUMBER.findall(text))

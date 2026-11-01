@@ -21,6 +21,9 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
 ]
 
+[project.optional-dependencies]
+rapid = ["rapidocr>=3.10.0", "onnxruntime>=1.20.0"]
+
 [project.scripts]
 docpipeline = "docpipeline:main"
 docpipeline-dual = "docpipeline.dual.cli:main"
@@ -53,6 +56,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "PL", "RUF"]
 "src/docpipeline/extractor.py" = ["PLC0415"]     # torch erst beim Laden importieren
 "src/docpipeline/dual/engines.py" = ["E501"]  # Layout-Prompt ist Datenmaterial und bleibt verbatim
 "src/docpipeline/dual/cli.py" = ["B008", "PLC0415"]  # typer-Optionen, uvicorn erst beim Start
+"src/docpipeline/dual/rapid.py" = ["PLC0415"]  # ONNX-Laufzeit nur bei Bedarf laden
 
 [tool.mypy]
 python_version = "3.12"
@@ -68,8 +72,10 @@ ignore_missing_imports = true
 dev = [
     "hypothesis>=6.170.14",
     "mypy>=2.4.1",
+    "onnxruntime>=1.20.0",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "pytest-randomly>=5.0.0",
+    "rapidocr>=3.10.0",
     "ruff>=0.17.3",
 ]

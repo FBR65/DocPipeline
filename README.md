@@ -24,7 +24,7 @@ document ─► pages (pymupdf) ─► text layer or OCR ─► document text
 | FastAPI (`create_app`, `create_router`) | implemented, tested |
 | Recall/precision benchmark against ground truth | implemented, tested |
 | Label Studio export (pre-annotation) | implemented, tested |
-| Dual OCR mode (`docpipeline-dual`, two engines merged) | implemented, tested; **not** benchmarked against single-engine results |
+| Dual OCR mode (`docpipeline-dual`): cells, three readers, majority | implemented, tested; **not** benchmarked against single-engine results |
 | Fine-tuning of the extraction model | **not implemented**, documented only (see [Fine-tuning](#fine-tuning)) |
 | Web UI | not implemented, out of scope |
 
@@ -236,7 +236,7 @@ All routes then live under `/docpipeline/v1/…`.
 | `warnings` | `empty_page:<n>` for pages without recognised text; processing continues |
 | `timings_ms` | Wall-clock milliseconds per stage |
 
-## Dual OCR mode (two engines)
+## Dual OCR mode (two engines, three readers)
 
 `docpipeline-dual` runs **both** OCR engines over every page and merges the
 results. It exists because the two engines fail differently: on a scanned tax
@@ -252,9 +252,11 @@ values and marks whether they agree.
 | Phase A | all pages through `paddleocr-vl`, two pages in parallel |
 | Phase B | all pages through `dots-mocr`, two pages in parallel |
 | Text layer | kept as a third source when the PDF has one; it does not replace OCR |
-| Union | key `(label, page, normalised value)`; agreement `both`, `single` or `text_layer` |
-| Conflicts | different values for the same label and page stay as two entities plus the warning `conflict:<label>:<page>` |
-| Verify | every entity is re-read from its bounding box at 300 dpi by `paddleocr-vl`; `verified` is `true`, `false` or `null` |
+| Cells | numbers are also read per table cell (dots HTML grid, paddle OTS grid); each cell is read with its row and column header; a hit carries `sources[].zelle` |
+| Third reader | `rapidocr` (PP-OCR, ONNX, CPU) reads the page in ~3 s and votes as a third source |
+| Union | numeric values are keyed by `(page, number)` — the label is not part of the key; agreement `consensus`, `majority` or `single` |
+| Conflicts | different values on the same page stay as two entities plus the warning `conflict:<label>:<page>` |
+| Verify | every entity is re-read from its bounding box at 300 dpi by `rapidocr`, falling back to `paddleocr-vl`; `verified` is `true`, `false` or `null` |
 
 ```bash
 uv run docpipeline-dual extract scan.pdf --schema schema.toml -o out/
@@ -272,7 +274,24 @@ DOCPIPELINE_SCHEMA_FILE=schema.toml uv run docpipeline-dual serve
 | `DOCPIPELINE_ENGINE_B_PROMPT` | official layout prompt | without it `dots.mocr` returns boxes but no text |
 | `DOCPIPELINE_ENGINE_B_MAX_TOKENS` | `8000` | a truncated answer is an error, not a shorter document |
 | `DOCPIPELINE_DUAL_WORKERS` | `2` | parallel pages per engine phase |
-| `DOCPIPELINE_DUAL_VERIFY` | `true` | region re-read (`--no-verify` turns it off) |
+| `DOCPIPELINE_ENGINE_C_DPI` | `300` | render resolution for the third reader |
+| `DOCPIPELINE_DUAL_ENGINE_C` | `true` | run RapidOCR as third reader when installed (D3a) |
+| `DOCPIPELINE_DUAL_VERIFY` | `true` | region re-read, RapidOCR first, paddle as fallback (`--no-verify` turns it off) |
+
+Agreement classes: `consensus` (every present source names the value), `majority`
+(at least two of three, but not all), `single` (one source). A tie at the top
+stays `single` for both values and is reported as `conflict:<label>:<page>` —
+the record never picks a winner by confidence.
+
+Numbers are compared by value, not by string: `98.765`, `98.765,00` and
+`98.765.00` are the same vote, and the label does not take part in the key — one
+reader calling a value `amount` and another `tax_number` still counts as two
+votes. The winning label comes from the best-scoring source, every label is kept
+in `sources[].label`, and a disagreement is reported as
+`label_conflict:<page>:<value>`. Text without a number stays bound to its label.
+
+Install the third reader with `uv sync --extra rapid`; without it the run uses
+two engines and warns `engine_c_unavailable`.
 
 The record is the same shape as the single-engine record, extended additively:
 
@@ -283,15 +302,49 @@ The record is the same shape as the single-engine record, extended additively:
   "ocr": {"model": "paddleocr-vl + dots-mocr", "pages_ocr": 2,
           "engines": [{"name": "paddleocr-vl", "dpi": 300, "pages": 1},
                       {"name": "dots-mocr", "dpi": 200, "pages": 1}]},
+  "cells": [{"page": 1, "table": 0, "rows": 4, "cols": 3,
+             "engines": ["dots-mocr", "paddleocr-vl"]}],
   "entities": [{"label": "amount", "text": "1.428,50", "normalized": "1428.50",
                 "start": 174, "end": 182, "page": 1, "score": 0.99,
-                "engine": "paddleocr-vl", "agreement": "both", "verified": true,
-                "sources": [{"engine": "paddleocr-vl", "start": 174, "end": 182, "score": 0.99},
-                            {"engine": "dots-mocr", "start": 181, "end": 189, "score": 0.93}]}]
+                "engine": "paddleocr-vl", "agreement": "majority", "verified": true,
+                "sources": [{"engine": "paddleocr-vl", "start": 174, "end": 182, "score": 0.99,
+                             "label": "amount"},
+                            {"engine": "dots-mocr", "start": 181, "end": 189, "score": 0.93,
+                             "label": "tax_number", "zelle": [0, 2, 1]},
+                            {"engine": "rapidocr", "start": 190, "end": 198, "score": 0.88,
+                             "label": "amount"}]}]
 }
 ```
 
-Measured cost per page: 43 s (paddle, 300 dpi) + 30 s (dots.mocr, 200 dpi). Each
+### Measured behaviour on a 27-page tax notice
+
+Both changes above were checked against a real document, not only against
+tests. The result is sobering and is therefore part of the documentation:
+
+| Value (page 1) | dots.mocr | paddleocr-vl | rapidocr |
+|---|---|---|---|
+| income tax | 54.321 | 54.322,00 | 54.326,00 |
+| solidarity surcharge | -56,78 | – | – |
+| tax number | 12/345/67890 | B421 | 0123 456-789 |
+| date | 01.02.2024 | 03.04.2025 | 02.03.2024 |
+| recognised numbers (all pages) | 30 | 6 | 5 |
+
+The intersection of numeric values is **empty for every pair of readers**:
+paddle ∩ dots = 0, paddle ∩ rapid = 0, dots ∩ rapid = 0. On this document the
+readers do not merely write the same number differently — they read different
+digits. No voting rule can produce a majority from that, and none is claimed to.
+What the run does produce: two `label_conflict` reports (the same number labelled
+`amount` by one reader and `tax_number` by another), 47 entities, 4 conflicts,
+and, with verification enabled, a per-entity second reading.
+
+Cells are the reason `dots.mocr` finds five times as many numbers as the text
+readers: it returns real table grids, while `paddleocr-vl` returns a page-wide
+grid only with the prompt `Table Recognition:` and `rapidocr` returns no grid at
+all. Grids from the two engines are not comparable cell by cell (a 4x2 table
+against a 22x5 page grid), so cell-level votes rarely form either.
+
+Measured cost per page: 43 s (paddle, 300 dpi) + 30 s (dots.mocr, 200 dpi) + 3 s
+(rapidocr, 300 dpi). Each
 region re-read costs roughly another 20–30 s, once per distinct bounding box, so
 a one-page document with twenty boxes needs about ten minutes with verification
 enabled; `--no-verify` skips only that stage. A repeated call on the *same* page
@@ -308,6 +361,11 @@ Limits of this mode:
   design.
 - Bounding boxes are pixels of the engine's own raster; they are converted to
   PDF points before cropping.
+- Numbers are compared by value and without the label, so a page that contains
+  the same number twice with different meanings (`212` as a tax number and
+  `432,00` as an amount) is reported as one finding with a `label_conflict`.
+- Grids of different engines are not aligned; a cell hit is evidence from one
+  reader, not a vote.
 
 ## Benchmark and validation
 
@@ -380,12 +438,12 @@ or set `model = "/path/to/checkpoint"` in the schema file.
 
 | Tool | Command | Purpose |
 |---|---|---|
-| Tests | `uv run pytest` | 173 unit tests, integration tests deselected |
+| Tests | `uv run pytest` | 251 unit tests, integration tests deselected |
 | Integration tests | `uv run pytest -m integration` | real OCR endpoints and real model |
 | Types | `uv run mypy` | strict, `src` only |
 | Lint | `uv run ruff check src tests` | E, F, I, UP, B, SIM, PL, RUF |
 | Coverage | `uv run pytest --cov=docpipeline --cov-branch` | branch coverage |
-| Mutation | `uv run python scripts/mutants.py` | thirteen hand-written mutants, each killed by a named test |
+| Mutation | `uv run python scripts/mutants.py` | twenty-one hand-written mutants, each killed by a named test |
 | Everything | `bash scripts/gauntlet.sh` | all layers in one run |
 | API smoke test | `bash scripts/api_smoke.sh` | starts uvicorn and calls every route against the real OCR endpoint |
 

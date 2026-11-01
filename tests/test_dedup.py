@@ -55,9 +55,7 @@ def test_partial_text_overlap_is_not_merged() -> None:
     gap=st.integers(min_value=0, max_value=40),
     distance=st.integers(min_value=0, max_value=40),
 )
-def test_property_idempotent(
-    label: str, text: str, start: int, gap: int, distance: int
-) -> None:
+def test_property_idempotent(label: str, text: str, start: int, gap: int, distance: int) -> None:
     ents = [e(label, text, start, 0.4), e(label, text, start + gap, 0.7)]
     once = dedupe(ents, distance_max=distance)
     assert dedupe(once, distance_max=distance) == once

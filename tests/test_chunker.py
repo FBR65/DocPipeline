@@ -82,9 +82,7 @@ def test_chunk_offsets_point_into_source_text() -> None:
     window=st.integers(min_value=2, max_value=40),
     overlap=st.integers(min_value=0, max_value=39),
 )
-def test_property_cover_and_overlap(
-    words: list[str], window: int, overlap: int
-) -> None:
+def test_property_cover_and_overlap(words: list[str], window: int, overlap: int) -> None:
     if overlap >= window:
         return
     text = " ".join(words)

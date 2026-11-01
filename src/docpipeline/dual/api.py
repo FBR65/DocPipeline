@@ -12,6 +12,7 @@ from docpipeline.api import VERSION, _check_path, _error
 from docpipeline.config import Settings
 from docpipeline.dual.engines import DotsEngine, DualOcr, DualSettings, PaddleEngine
 from docpipeline.dual.pipeline import DualPipeline
+from docpipeline.dual.rapid import RapidEngine
 from docpipeline.errors import (
     DocPipelineError,
     EmptyFileError,
@@ -23,7 +24,13 @@ from docpipeline.schema import ExtractionSchema, load_schema
 
 
 def build_dual(settings: DualSettings, engines: list[Any] | None = None) -> DualOcr:
-    return DualOcr(settings, engines=engines or [PaddleEngine(settings), DotsEngine(settings)])
+    """Zwei Pflicht-Engines, RapidOCR nur wenn freigegeben und installiert (D3a)."""
+    if engines:
+        return DualOcr(settings, engines=engines)
+    built: list[Any] = [PaddleEngine(settings), DotsEngine(settings)]
+    if getattr(settings, "dual_engine_c", False) and RapidEngine.available():
+        built.append(RapidEngine(settings))
+    return DualOcr(settings, engines=built)
 
 
 def create_router(

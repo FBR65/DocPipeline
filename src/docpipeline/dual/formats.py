@@ -40,6 +40,7 @@ class Element:
     bbox: tuple[float, float, float, float]
     category: str
     text: str = ""
+    score: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -97,9 +98,7 @@ def parse_dots(payload: str | dict[str, Any] | list[Any], page_no: int = 1) -> O
         except ValueError as exc:
             raise OcrError("Layout-Antwort ist kein gültiges JSON", page=page_no) from exc
     elements = (
-        (data.get("elements") or data.get("layout") or [])
-        if isinstance(data, dict)
-        else data
+        (data.get("elements") or data.get("layout") or []) if isinstance(data, dict) else data
     )
     if not isinstance(elements, list):
         raise OcrError("Layout-Antwort enthält keine Elementliste", page=page_no)

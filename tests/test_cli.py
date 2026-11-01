@@ -106,9 +106,7 @@ def test_extract_help_exits_zero() -> None:
     assert "--schema" in result.stdout
 
 
-def test_export_command_writes_label_studio(
-    fake_runtime, blank_pdf: Path, tmp_path: Path
-) -> None:
+def test_export_command_writes_label_studio(fake_runtime, blank_pdf: Path, tmp_path: Path) -> None:
     target = tmp_path / "ls.json"
     result = runner.invoke(
         cli.app, ["export", str(blank_pdf), "--out", str(target), "--schema", "s"]
@@ -118,9 +116,7 @@ def test_export_command_writes_label_studio(
     assert data["annotations"][0]["result"][0]["value"]["text"] == "ACME"
 
 
-def test_bench_passes_with_full_recall(
-    fake_runtime, blank_pdf: Path, tmp_path: Path
-) -> None:
+def test_bench_passes_with_full_recall(fake_runtime, blank_pdf: Path, tmp_path: Path) -> None:
     gt = tmp_path / "gt"
     gt.mkdir()
     (gt / "scan.json").write_text(
@@ -128,8 +124,17 @@ def test_bench_passes_with_full_recall(
     )
     result = runner.invoke(
         cli.app,
-        ["bench", "--docs", str(blank_pdf), "--gt", str(gt), "--schema", "s",
-         "--min-recall", "0.9"],
+        [
+            "bench",
+            "--docs",
+            str(blank_pdf),
+            "--gt",
+            str(gt),
+            "--schema",
+            "s",
+            "--min-recall",
+            "0.9",
+        ],
     )
     assert result.exit_code == 0, result.output
     assert "100.0%" in result.stdout
@@ -144,9 +149,7 @@ def test_build_runtime_uses_schema_file(
         encoding="utf-8",
     )
     monkeypatch.setattr(cli, "OcrClient", lambda _s: FakeOcr({1: "ACME"}))
-    monkeypatch.setattr(
-        cli, "Gliner2Extractor", lambda **kw: FakeExtractor({"buyer": "ACME"})
-    )
+    monkeypatch.setattr(cli, "Gliner2Extractor", lambda **kw: FakeExtractor({"buyer": "ACME"}))
     pipeline, schema = cli.build_runtime(settings, schema_path)
     assert schema.threshold == 0.4
     assert settings.schema_file == str(schema_path)

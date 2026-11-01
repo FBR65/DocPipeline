@@ -73,9 +73,7 @@ def test_pipeline_on_article_uses_text_layer() -> None:
         def ping(self) -> bool:
             return True
 
-    schema = ExtractionSchema(
-        labels={"title": "Titel des Artikels", "author": "Name des Autors"}
-    )
+    schema = ExtractionSchema(labels={"title": "Titel des Artikels", "author": "Name des Autors"})
     pipeline = DocumentPipeline(settings, schema, NoOcr(), Gliner2Extractor(device="cpu"))
     record = pipeline.run(ARTICLE)
 

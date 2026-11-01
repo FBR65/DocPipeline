@@ -8,6 +8,7 @@ der Basis.
 from __future__ import annotations
 
 import re
+from decimal import Decimal, InvalidOperation
 
 from docpipeline.dedup import normalize
 
@@ -91,3 +92,33 @@ def _split_single(digits: str, separator: str) -> tuple[str, str | None]:
     if is_decimal and len(last) <= _MAX_DECIMAL_DIGITS and len(parts) >= _TWO_GROUPS:
         return "".join(parts[:-1]), last
     return digits.replace(separator, ""), None
+
+
+def is_number(text: str) -> bool:
+    """Trägt der Text einen Zahlenwert, der als Stimme zählt?"""
+    return _is_numeric(text) and _first_number(text) is not None
+
+
+def number_key(text: str) -> str:
+    """Vergleichsschlüssel: nur die Zahl, ohne angehängte Nullen.
+
+    ``98.765``, ``98.765,00`` und ``98.765.00`` ergeben denselben Schlüssel,
+    weil der Zahlenwert gleich ist. Text ohne Zahl wird wie bisher normalisiert.
+    """
+    if not _is_numeric(text):
+        return normalize(text)
+    match = _first_number(text)
+    if match is None:
+        return normalize(text)
+    raw = match.group().translate(_CLEAN)
+    negative = raw.startswith("-")
+    whole, decimals = _split(raw.lstrip("+-"))
+    try:
+        value = Decimal(whole + (f".{decimals}" if decimals else ""))
+    except InvalidOperation:
+        return normalize(text)
+    if negative:
+        value = -value
+    if value == 0:
+        return "0"
+    return format(value.normalize(), "f")

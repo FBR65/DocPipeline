@@ -123,9 +123,7 @@ def bench(
             raise typer.Exit(1) from error
     report = compare(records, load_ground_truth(gt))
     typer.echo(format_table(report))
-    if min_recall is not None and any(
-        score.recall < min_recall for score in report.values()
-    ):
+    if min_recall is not None and any(score.recall < min_recall for score in report.values()):
         raise typer.Exit(1)
 
 

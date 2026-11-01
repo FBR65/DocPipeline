@@ -14,6 +14,8 @@ class SourceRef(BaseModel):
     start: int
     end: int
     score: float = 0.0
+    zelle: tuple[int, int, int] | None = None
+    label: str | None = None
 
 
 class Entity(BaseModel):
@@ -30,6 +32,18 @@ class Entity(BaseModel):
     agreement: str | None = None
     verified: bool | None = None
     sources: list[SourceRef] = Field(default_factory=list)
+
+
+class CellInfo(BaseModel):
+    """Zusammenfassung eines Zellrasters im Record."""
+
+    model_config = ConfigDict(frozen=True)
+
+    page: int
+    table: int
+    rows: int
+    cols: int
+    engines: list[str] = Field(default_factory=list)
 
 
 class EngineInfo(BaseModel):
@@ -58,6 +72,7 @@ class DocumentRecord(BaseModel):
     ocr: OcrInfo
     text: str | None = None
     variants: dict[str, str] = Field(default_factory=dict)
+    cells: list[CellInfo] = Field(default_factory=list)
     entities: list[Entity] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     timings_ms: dict[str, float] = Field(default_factory=dict)

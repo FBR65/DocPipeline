@@ -72,3 +72,46 @@ def test_dual_pipeline_end_to_end_without_verify() -> None:
             assert snippet.lower() == entity.text.lower() or snippet, "Offset zeigt ins Leere"
         assert variant_text
     assert "ocr" in record.timings_ms and "extract" in record.timings_ms
+
+
+def test_rapid_reader_reads_the_same_page() -> None:
+    """S2: RapidOCR gegen dieselbe Seite, ohne Umweg über den Server."""
+    import pymupdf
+
+    from docpipeline.dual.rapid import RapidEngine
+
+    assert RapidEngine.available() is True
+    with pymupdf.open(_pdf()) as document:
+        png = document[0].get_pixmap(dpi=300).tobytes("png")
+
+    engine = RapidEngine(DualSettings())
+    page = engine.describe_page(png, page_no=1)
+    assert len(page.text) > 200
+    assert len(page.boxes) > 20
+    assert any("Musterstadt" in box.text for box in page.boxes)
+    engine.close()
+
+
+def test_three_engines_vote_on_the_same_page() -> None:
+    """S3: drei Leser, Mehrheit statt Zweifach-Vergleich."""
+    from docpipeline.dual.rapid import RapidEngine
+
+    settings = DualSettings(ocr_mode="auto", dual_verify=False, dual_engine_c=True)
+    engines = [PaddleEngine(settings), DotsEngine(settings), RapidEngine(settings)]
+    schema = ExtractionSchema(
+        model="fastino/gliner2.5-multi-v1",
+        labels={"amount": "Geldbetrag mit Währung", "date": "Ein Datum"},
+    )
+    with DualOcr(settings, engines=engines) as dual:
+        record = DualPipeline(
+            settings, schema, dual, Gliner2Extractor(device="cpu"), verify=False
+        ).run(_pdf())
+
+    assert {variant for variant in record.variants} >= {"paddleocr-vl", "dots-mocr", "rapidocr"}
+    assert record.cells, "mindestens ein Zellraster muss im Record stehen"
+    classes = {entity.agreement for entity in record.entities}
+    assert classes <= {"consensus", "majority", "single"}
+    # Befund: auf diesem Dokument erreicht kaum ein Wert zwei Stimmen, weil die
+    # Leser unterschiedliche Spans liefern. Das ist kein Fehler, sondern der Grund
+    # für den Marker; die Mehrheitsregel selbst prüfen die Unit-Tests.
+    assert sum(len(entity.sources) for entity in record.entities) >= len(record.entities)

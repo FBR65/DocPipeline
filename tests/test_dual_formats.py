@@ -13,8 +13,7 @@ from docpipeline.errors import OcrError
 DOTS_ANSWER = [
     {"bbox": [31, 19, 111, 34], "category": "Page-header", "text": "Finanzamt Musterstadt"},
     {"bbox": [63, 95, 86, 118], "category": "Picture"},
-    {"bbox": [149, 19, 806, 35], "category": "Page-header",
-     "text": "05.03.2024"},
+    {"bbox": [149, 19, 806, 35], "category": "Page-header", "text": "05.03.2024"},
     {
         "bbox": [90, 225, 750, 591],
         "category": "Table",

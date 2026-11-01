@@ -56,8 +56,12 @@ class DualSettings(Settings):
     engine_b_prompt: str = DOTS_PROMPT
     engine_b_max_tokens: int = 8000
 
+    engine_c_dpi: int = 300
+    engine_c_min_confidence: float = 0.5
+
     dual_workers: int = 2
     dual_verify: bool = True
+    dual_engine_c: bool = True
 
 
 @runtime_checkable

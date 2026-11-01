@@ -9,24 +9,14 @@ import pytest
 from docpipeline.extractor import Gliner2Extractor, to_entities
 from docpipeline.records import Entity
 
-TEXT = (
-    "Rechnung Nr. RE-2026-0042\n"
-    "Lieferant: Musterwerke GmbH\n"
-    "Gesamtbetrag: 1.428,50 EUR\n"
-)
+TEXT = "Rechnung Nr. RE-2026-0042\nLieferant: Musterwerke GmbH\nGesamtbetrag: 1.428,50 EUR\n"
 
 # Echte Antwortform von fastino/gliner2.5-multi-v1 mit include_spans=True.
 REAL_SHAPE = {
     "entities": {
-        "invoice_number": [
-            {"text": "RE-2026-0042", "confidence": 0.9958, "start": 13, "end": 25}
-        ],
-        "supplier": [
-            {"text": "Musterwerke GmbH", "confidence": 0.9064, "start": 37, "end": 53}
-        ],
-        "amount": [
-            {"text": "1.428,50 EUR", "confidence": 0.9928, "start": 68, "end": 80}
-        ],
+        "invoice_number": [{"text": "RE-2026-0042", "confidence": 0.9958, "start": 13, "end": 25}],
+        "supplier": [{"text": "Musterwerke GmbH", "confidence": 0.9064, "start": 37, "end": 53}],
+        "amount": [{"text": "1.428,50 EUR", "confidence": 0.9928, "start": 68, "end": 80}],
     }
 }
 

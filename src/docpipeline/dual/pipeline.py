@@ -11,6 +11,7 @@ import pymupdf
 
 from docpipeline.chunker import chunk
 from docpipeline.config import Settings
+from docpipeline.dual.cells import extract_cells
 from docpipeline.dual.engines import DualOcr, DualSettings, OcrEngine, Variant, open_pdf
 from docpipeline.dual.formats import Element
 from docpipeline.dual.union import TEXT_LAYER, unite
@@ -18,10 +19,18 @@ from docpipeline.dual.verify import Crop, verify_entities
 from docpipeline.errors import EmptyFileError, UnsupportedFormatError
 from docpipeline.extractor import EntityExtractor
 from docpipeline.ingest import IMAGE_SUFFIXES, PDF_SUFFIXES
-from docpipeline.records import DocumentRecord, EngineInfo, Entity, OcrInfo
+from docpipeline.records import (
+    CellInfo,
+    DocumentRecord,
+    EngineInfo,
+    Entity,
+    OcrInfo,
+    SourceRef,
+)
 from docpipeline.schema import ExtractionSchema
 
 VERIFY_DPI = 300
+FAST_READER = "rapidocr"
 
 
 class VariantSource(Protocol):
@@ -68,6 +77,9 @@ class DualPipeline:
         entities, warnings = unite(per_variant)
         timings["extract"] = _ms(started)
 
+        if getattr(self._settings, "dual_engine_c", False) and not self._has_fast_reader():
+            warnings = sorted({*warnings, "engine_c_unavailable"})
+
         if self._verify and entities:
             started = perf_counter()
             engine = self._verify_engine or self._default_verify_engine()
@@ -105,6 +117,7 @@ class DualPipeline:
             text=self._canonical_text(variants),
             variants={variant.name: variant.text for variant in variants},
             entities=entities,
+            cells=self._cell_summary(variants),
             warnings=warnings,
             timings_ms=timings,
         )
@@ -130,6 +143,27 @@ class DualPipeline:
                         }
                     )
                 )
+        for cell, entity in extract_cells(variant, self._extractor, self._schema):
+            start = entity.start
+            found.append(
+                entity.model_copy(
+                    update={
+                        "start": start,
+                        "end": start + len(entity.text),
+                        "page": cell.page,
+                        "engine": variant.name,
+                        "sources": [
+                            SourceRef(
+                                engine=variant.name,
+                                start=start,
+                                end=start + len(entity.text),
+                                score=entity.score,
+                                zelle=(cell.table, cell.row, cell.col),
+                            )
+                        ],
+                    }
+                )
+            )
         return found
 
     @staticmethod
@@ -176,10 +210,43 @@ class DualPipeline:
         return {page: boxes for page, boxes in best.items() if boxes}
 
     def _default_verify_engine(self) -> OcrEngine | None:
-        engines = getattr(self._dual, "engines", None)
-        if engines:
-            return cast("OcrEngine", engines[0])
-        return None
+        engines = list(getattr(self._dual, "engines", []) or [])
+        for engine in engines:
+            if getattr(engine, "name", "") == FAST_READER:
+                return cast("OcrEngine", engine)
+        return cast("OcrEngine", engines[0]) if engines else None
+
+    def _has_fast_reader(self) -> bool:
+        return any(
+            getattr(engine, "name", "") == FAST_READER
+            for engine in getattr(self._dual, "engines", []) or []
+        )
+
+    @staticmethod
+    def _cell_summary(variants: list[Variant]) -> list[CellInfo]:
+        """Je Seite und Tabelle die Maße und die Engines, die ein Raster liefern."""
+        found: dict[tuple[int, int], tuple[int, int, set[str]]] = {}
+        for variant in variants:
+            for page_no, tables in enumerate(variant.tables, start=1):
+                for table_no, table in enumerate(tables):
+                    rows = len(table.grid)
+                    cols = max((len(row) for row in table.grid), default=0)
+                    key = (page_no, table_no)
+                    if key in found:
+                        _rows, _cols, engines = found[key]
+                        engines.add(variant.name)
+                        continue
+                    found[key] = (rows, cols, {variant.name})
+        return [
+            CellInfo(
+                page=page_no,
+                table=table_no,
+                rows=rows,
+                cols=cols,
+                engines=sorted(engines),
+            )
+            for (page_no, table_no), (rows, cols, engines) in sorted(found.items())
+        ]
 
     @staticmethod
     def _crop_from(source: Path) -> Crop:

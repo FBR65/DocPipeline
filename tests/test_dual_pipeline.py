@@ -73,7 +73,7 @@ def test_record_carries_all_variants(
     record = pipeline.run(_pdf(tmp_path))
     assert set(record.variants) == {"paddleocr-vl", "dots-mocr", "text_layer"}
     assert record.text == "ACME kauft"
-    assert record.entities[0].agreement == "text_layer"
+    assert record.entities[0].agreement == "consensus"
     assert len(record.entities[0].sources) == 3
 
 

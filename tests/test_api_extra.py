@@ -50,9 +50,7 @@ def test_export_rejects_other_content_type(settings: Settings) -> None:
 
 
 def test_extract_rejects_other_content_type(settings: Settings) -> None:
-    resp = _app(settings).post(
-        "/v1/extract", content=b"x", headers={"content-type": "text/plain"}
-    )
+    resp = _app(settings).post("/v1/extract", content=b"x", headers={"content-type": "text/plain"})
     assert resp.status_code == 415
 
 

@@ -30,9 +30,7 @@ def test_blank_page_gets_png_image(settings: Settings, blank_pdf: Path) -> None:
     assert pages[0].image.startswith(b"\x89PNG")
 
 
-def test_ocr_mode_always_ignores_text_layer(
-    settings: Settings, text_pdf: Path
-) -> None:
+def test_ocr_mode_always_ignores_text_layer(settings: Settings, text_pdf: Path) -> None:
     settings.ocr_mode = "always"
     pages = render_pages(text_pdf, settings)
     assert pages[0].text is None

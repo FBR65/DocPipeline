@@ -108,7 +108,7 @@ def test_extract_by_path_returns_dual_record(tmp_path: Path, scan: Path) -> None
     assert response.status_code == 200
     body = response.json()
     assert set(body["variants"]) == {"paddleocr-vl", "dots-mocr"}
-    assert body["entities"][0]["agreement"] == "both"
+    assert body["entities"][0]["agreement"] == "consensus"
     assert len(body["entities"][0]["sources"]) == 2
 
 
@@ -179,7 +179,7 @@ def test_cli_extract_writes_record(
     )
     assert result.exit_code == 0, result.output
     data = json.loads((target / "scan.json").read_text(encoding="utf-8"))
-    assert data["entities"][0]["agreement"] == "both"
+    assert data["entities"][0]["agreement"] == "consensus"
     assert "scan" in result.stdout
 
 
@@ -239,3 +239,21 @@ def test_cli_no_verify_flag(tmp_path: Path, scan: Path, monkeypatch: pytest.Monk
     )
     assert result.exit_code == 0, result.output
     assert seen.get("verify") is False
+
+
+def test_build_dual_uses_three_engines_when_rapid_is_available(tmp_path: Path) -> None:
+    from docpipeline.dual.api import build_dual
+
+    settings = _settings(tmp_path)
+    dual = build_dual(settings)
+    names = [engine.name for engine in dual.engines]
+    assert names[:2] == ["paddleocr-vl", "dots-mocr"]
+    assert ("rapidocr" in names) is True
+
+
+def test_build_dual_stays_at_two_engines_when_disabled(tmp_path: Path) -> None:
+    from docpipeline.dual.api import build_dual
+
+    settings = _settings(tmp_path)
+    settings.dual_engine_c = False
+    assert [engine.name for engine in build_dual(settings).engines] == ["paddleocr-vl", "dots-mocr"]

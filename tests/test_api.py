@@ -47,9 +47,7 @@ def test_health_when_ocr_down(settings: Settings) -> None:
 
 def test_extract_upload(client: TestClient, blank_pdf: Path) -> None:
     with blank_pdf.open("rb") as fh:
-        resp = client.post(
-            "/v1/extract", files={"file": ("scan.pdf", fh, "application/pdf")}
-        )
+        resp = client.post("/v1/extract", files={"file": ("scan.pdf", fh, "application/pdf")})
     assert resp.status_code == 200
     record = resp.json()
     assert record["pages"] == 1
@@ -96,9 +94,7 @@ def test_too_large_upload_gives_413(settings: Settings, blank_pdf: Path) -> None
     settings.max_upload_bytes = 10
     client = TestClient(_app(settings))
     with blank_pdf.open("rb") as fh:
-        resp = client.post(
-            "/v1/extract", files={"file": ("scan.pdf", fh, "application/pdf")}
-        )
+        resp = client.post("/v1/extract", files={"file": ("scan.pdf", fh, "application/pdf")})
     assert resp.status_code == 413
 
 
@@ -145,8 +141,6 @@ def test_router_can_be_mounted_on_foreign_app(settings: Settings, blank_pdf: Pat
 
 def test_api_import_does_not_pull_cli_library() -> None:
     code = "import sys, docpipeline.api; print('typer' in sys.modules)"
-    out = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, check=False
-    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == "False"

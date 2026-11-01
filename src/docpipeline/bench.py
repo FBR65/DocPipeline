@@ -106,8 +106,7 @@ def compare(
 
 def format_table(report: dict[str, LabelScore]) -> str:
     header = (
-        f"{'label':<20} {'recall':>8} {'precision':>10} "
-        f"{'tp':>4} {'fp':>4} {'fn':>4} {'docs':>5}"
+        f"{'label':<20} {'recall':>8} {'precision':>10} {'tp':>4} {'fp':>4} {'fn':>4} {'docs':>5}"
     )
     lines = [header, "-" * len(header)]
     for label, score in report.items():
