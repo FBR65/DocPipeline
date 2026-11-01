@@ -1,8 +1,0 @@
-# Schema: Artikel / Publikation
-model = "fastino/gliner2.5-multi-v1"
-threshold = 0.30
-
-[labels]
-title = "Titel des Artikels"
-author = "Name des Autors"
-publication = "Name der Publikation oder Zeitschrift"
