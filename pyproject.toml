@@ -23,6 +23,7 @@ dependencies = [
 
 [project.scripts]
 docpipeline = "docpipeline:main"
+docpipeline-dual = "docpipeline.dual.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
@@ -50,6 +51,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "PL", "RUF"]
 "src/docpipeline/cli.py" = ["B008", "PLC0415"]  # typer-Optionen sind Standard-API
 "src/docpipeline/__init__.py" = ["PLC0415"]      # CLI-Import bleibt schlank
 "src/docpipeline/extractor.py" = ["PLC0415"]     # torch erst beim Laden importieren
+"src/docpipeline/dual/engines.py" = ["E501"]  # Layout-Prompt ist Datenmaterial und bleibt verbatim
+"src/docpipeline/dual/cli.py" = ["B008", "PLC0415"]  # typer-Optionen, uvicorn erst beim Start
 
 [tool.mypy]
 python_version = "3.12"

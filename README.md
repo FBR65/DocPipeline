@@ -24,6 +24,7 @@ document ─► pages (pymupdf) ─► text layer or OCR ─► document text
 | FastAPI (`create_app`, `create_router`) | implemented, tested |
 | Recall/precision benchmark against ground truth | implemented, tested |
 | Label Studio export (pre-annotation) | implemented, tested |
+| Dual OCR mode (`docpipeline-dual`, two engines merged) | implemented, tested; **not** benchmarked against single-engine results |
 | Fine-tuning of the extraction model | **not implemented**, documented only (see [Fine-tuning](#fine-tuning)) |
 | Web UI | not implemented, out of scope |
 
@@ -73,10 +74,10 @@ hypothesis, ruff, mypy, pytest-cov, pytest-randomly).
 
 ```bash
 # one document, invoice-style fields
-uv run docpipeline extract invoice.pdf --schema data/schema.invoice.toml -o out/
+uv run docpipeline extract invoice.pdf --schema schema.toml -o out/
 
 # the same document through the HTTP API
-DOCPIPELINE_SCHEMA_FILE=data/schema.invoice.toml uv run docpipeline serve
+DOCPIPELINE_SCHEMA_FILE=schema.toml uv run docpipeline serve
 curl -s -X POST http://127.0.0.1:8000/v1/extract \
      -F "file=@invoice.pdf" | jq .entities
 ```
@@ -136,7 +137,7 @@ Rules enforced by `docpipeline.schema.load_schema`:
 | Unknown top-level keys | `SchemaError` |
 
 Label descriptions are passed to the model and raise precision; an empty
-description is allowed. Two example schemas ship in `data/`.
+description is allowed. The schema file is yours to keep; it is not part of this package.
 
 ## CLI
 
@@ -161,7 +162,7 @@ Exit codes: `0` success, `1` processing error, `2` configuration or schema error
 Example run on a six-page article PDF using the text layer, CPU model:
 
 ```
-$ uv run docpipeline extract article.pdf --schema data/schema.article.toml -o out/
+$ uv run docpipeline extract article.pdf --schema schema.toml -o out/
 article  20  13894 ms
 ```
 
@@ -203,7 +204,7 @@ from docpipeline.schema import load_schema
 
 app = FastAPI()
 app.include_router(
-    create_router(Settings(), schema=load_schema("data/schema.invoice.toml")),
+    create_router(Settings(), schema=load_schema("schema.toml")),
     prefix="/docpipeline",
 )
 ```
@@ -235,6 +236,79 @@ All routes then live under `/docpipeline/v1/…`.
 | `warnings` | `empty_page:<n>` for pages without recognised text; processing continues |
 | `timings_ms` | Wall-clock milliseconds per stage |
 
+## Dual OCR mode (two engines)
+
+`docpipeline-dual` runs **both** OCR engines over every page and merges the
+results. It exists because the two engines fail differently: on a scanned tax
+notice, `paddleocr-vl` read the amounts correctly (`-9.874,00`) while
+`dots-mocr` got them wrong (`-9.876,00`), and `dots-mocr` read the names
+correctly ("Steuernummer", "Beispiel & Partner GmbH") where paddle produced
+"Stauernnummer". Neither engine is reliably better, so the system keeps both
+values and marks whether they agree.
+
+| Stage | Behaviour |
+|---|---|
+| Render | paddle at 300 dpi, dots.mocr at 200 dpi (each engine renders its own image) |
+| Phase A | all pages through `paddleocr-vl`, two pages in parallel |
+| Phase B | all pages through `dots-mocr`, two pages in parallel |
+| Text layer | kept as a third source when the PDF has one; it does not replace OCR |
+| Union | key `(label, page, normalised value)`; agreement `both`, `single` or `text_layer` |
+| Conflicts | different values for the same label and page stay as two entities plus the warning `conflict:<label>:<page>` |
+| Verify | every entity is re-read from its bounding box at 300 dpi by `paddleocr-vl`; `verified` is `true`, `false` or `null` |
+
+```bash
+uv run docpipeline-dual extract scan.pdf --schema schema.toml -o out/
+uv run docpipeline-dual extract scan.pdf --schema schema.toml --no-verify
+DOCPIPELINE_SCHEMA_FILE=schema.toml uv run docpipeline-dual serve
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DOCPIPELINE_ENGINE_A_MODEL` | `paddleocr-vl` | text engine |
+| `DOCPIPELINE_ENGINE_A_DPI` | `300` | render resolution for the text engine |
+| `DOCPIPELINE_ENGINE_B_BASE_URL` | same as `OCR_BASE_URL` | endpoint for the layout engine |
+| `DOCPIPELINE_ENGINE_B_MODEL` | `dots-mocr` | layout engine |
+| `DOCPIPELINE_ENGINE_B_DPI` | `200` | render resolution for the layout engine |
+| `DOCPIPELINE_ENGINE_B_PROMPT` | official layout prompt | without it `dots.mocr` returns boxes but no text |
+| `DOCPIPELINE_ENGINE_B_MAX_TOKENS` | `8000` | a truncated answer is an error, not a shorter document |
+| `DOCPIPELINE_DUAL_WORKERS` | `2` | parallel pages per engine phase |
+| `DOCPIPELINE_DUAL_VERIFY` | `true` | region re-read (`--no-verify` turns it off) |
+
+The record is the same shape as the single-engine record, extended additively:
+
+```json
+{
+  "text": "…text of the text layer, else of engine A…",
+  "variants": {"paddleocr-vl": "…", "dots-mocr": "…", "text_layer": "…"},
+  "ocr": {"model": "paddleocr-vl + dots-mocr", "pages_ocr": 2,
+          "engines": [{"name": "paddleocr-vl", "dpi": 300, "pages": 1},
+                      {"name": "dots-mocr", "dpi": 200, "pages": 1}]},
+  "entities": [{"label": "amount", "text": "1.428,50", "normalized": "1428.50",
+                "start": 174, "end": 182, "page": 1, "score": 0.99,
+                "engine": "paddleocr-vl", "agreement": "both", "verified": true,
+                "sources": [{"engine": "paddleocr-vl", "start": 174, "end": 182, "score": 0.99},
+                            {"engine": "dots-mocr", "start": 181, "end": 189, "score": 0.93}]}]
+}
+```
+
+Measured cost per page: 43 s (paddle, 300 dpi) + 30 s (dots.mocr, 200 dpi). Each
+region re-read costs roughly another 20–30 s, once per distinct bounding box, so
+a one-page document with twenty boxes needs about ten minutes with verification
+enabled; `--no-verify` skips only that stage. A repeated call on the *same* page
+image is much cheaper because the server caches the image part of the prompt; a
+cropped region is a new image and is not cached.
+
+Limits of this mode:
+
+- There is **no benchmark** comparing the merged result with a single engine.
+  The union preserves both readings and exposes disagreement; it does not prove
+  that the merged output is better. Treat `agreement` and `verified` as review
+  signals, not as guarantees.
+- Both engines always run, even for born-digital PDFs, so the mode is slower by
+  design.
+- Bounding boxes are pixels of the engine's own raster; they are converted to
+  PDF points before cropping.
+
 ## Benchmark and validation
 
 Ground truth is one JSON file per document, named after the document stem:
@@ -247,20 +321,21 @@ Ground truth is one JSON file per document, named after the document stem:
 per label: recall, precision, true positives, false positives, false negatives,
 and documents present in the ground truth but missing from the run.
 
-Demo run included in the repository: one document, three fields, ground truth
-read from the PDF by hand.
+A run on a single document with three labels looks like this (percentages are
+the share of ground-truth values that were found and of the predictions that
+were correct):
 
 ```
-$ uv run docpipeline bench --docs article.pdf --gt data/gt --schema data/schema.article.toml
+$ uv run docpipeline bench --docs invoice.pdf --gt gt/ --schema schema.toml
 label                  recall  precision   tp   fp   fn  docs
 author                 100.0%      12.5%    1    7    0     0
 publication            100.0%      50.0%    1    1    0     0
 title                  100.0%      10.0%    1    9    0     0
 ```
 
-This demonstrates that the measurement path works. It is not an accuracy
-claim: one document and three generic labels over running text produce many
-false positives by construction. Recall and precision become meaningful with a
+Those numbers come from one document and three generic labels over running
+text, which produces many false positives by construction. They show that the
+measurement path works, not that the pipeline is accurate. Recall and precision become meaningful with a
 labelled set of real documents per document type.
 
 ## Label Studio export
@@ -305,12 +380,12 @@ or set `model = "/path/to/checkpoint"` in the schema file.
 
 | Tool | Command | Purpose |
 |---|---|---|
-| Tests | `uv run pytest` | 94 unit tests, integration tests deselected |
-| Integration tests | `uv run pytest -m integration` | real OCR endpoint and real model |
+| Tests | `uv run pytest` | 173 unit tests, integration tests deselected |
+| Integration tests | `uv run pytest -m integration` | real OCR endpoints and real model |
 | Types | `uv run mypy` | strict, `src` only |
 | Lint | `uv run ruff check src tests` | E, F, I, UP, B, SIM, PL, RUF |
 | Coverage | `uv run pytest --cov=docpipeline --cov-branch` | branch coverage |
-| Mutation | `uv run python scripts/mutants.py` | seven hand-written mutants, each killed by a named test |
+| Mutation | `uv run python scripts/mutants.py` | thirteen hand-written mutants, each killed by a named test |
 | Everything | `bash scripts/gauntlet.sh` | all layers in one run |
 | API smoke test | `bash scripts/api_smoke.sh` | starts uvicorn and calls every route against the real OCR endpoint |
 

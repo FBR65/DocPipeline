@@ -16,8 +16,8 @@ htmlcov/
 .ruff_cache/
 .pytest_cache/
 
-# Third-party source document (not covered by this project's licence)
-Extract Anything From Anywhere*.pdf
+# Third-party and private source documents (never part of the repository)
+*.pdf
 
 # Local configuration
 .env

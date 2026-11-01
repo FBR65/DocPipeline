@@ -5,6 +5,17 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class SourceRef(BaseModel):
+    """Eine Fundstelle einer Entität in genau einer Textvariante."""
+
+    model_config = ConfigDict(frozen=True)
+
+    engine: str
+    start: int
+    end: int
+    score: float = 0.0
+
+
 class Entity(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -14,6 +25,20 @@ class Entity(BaseModel):
     end: int
     page: int | None = None
     score: float = 0.0
+    normalized: str | None = None
+    engine: str | None = None
+    agreement: str | None = None
+    verified: bool | None = None
+    sources: list[SourceRef] = Field(default_factory=list)
+
+
+class EngineInfo(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    model: str
+    dpi: int | None = None
+    pages: int = 0
 
 
 class OcrInfo(BaseModel):
@@ -21,6 +46,7 @@ class OcrInfo(BaseModel):
 
     model: str
     pages_ocr: int
+    engines: list[EngineInfo] = Field(default_factory=list)
 
 
 class DocumentRecord(BaseModel):
@@ -31,6 +57,7 @@ class DocumentRecord(BaseModel):
     pages: int
     ocr: OcrInfo
     text: str | None = None
+    variants: dict[str, str] = Field(default_factory=dict)
     entities: list[Entity] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     timings_ms: dict[str, float] = Field(default_factory=dict)

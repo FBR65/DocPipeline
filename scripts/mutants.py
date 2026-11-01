@@ -64,6 +64,49 @@ MUTANTS = [
         "total = self.tp + self.fp",
         "tests/test_bench.py::test_compare_counts_matches_case_insensitive",
     ),
+    # --- Doppellauf (docpipeline/dual) ---
+    (
+        "Union meldet Einigkeit auch bei einer Quelle",
+        "dual/union.py",
+        'return "both" if len(names) > 1 else "single"',
+        'return "both"',
+        "tests/test_dual_union.py::test_single_source_is_marked",
+    ),
+    (
+        "Konflikt wird nicht mehr erkannt",
+        "dual/union.py",
+        "if len(values) > 1",
+        "if len(values) > 99",
+        "tests/test_dual_union.py::test_different_numbers_on_same_page_conflict",
+    ),
+    (
+        "Trennzeichen werden vertauscht gelesen",
+        "dual/values.py",
+        '    if digits.rfind(",") > digits.rfind("."):',
+        '    if digits.rfind(",") < digits.rfind("."):',
+        "tests/test_dual_values.py::test_numbers_normalise_across_formats",
+    ),
+    (
+        "OTS-Zeilen werden nicht getrennt",
+        "dual/formats.py",
+        '        if kind == "nl":',
+        "        if kind == 'nl_':",
+        "tests/test_dual_formats.py::test_parse_ots_grid_has_rows_and_cells",
+    ),
+    (
+        "Regionen-Nachlesen meldet immer Erfolg",
+        "dual/verify.py",
+        'verified.append(entity.model_copy(update={"verified": False}))',
+        'verified.append(entity.model_copy(update={"verified": True}))',
+        "tests/test_dual_verify.py::test_differing_region_marks_false",
+    ),
+    (
+        "Textlayer wird zugunsten der Engine verworfen",
+        "dual/pipeline.py",
+        "            if variant.name == TEXT_LAYER and variant.text.strip():",
+        "            if variant.name == TEXT_LAYER and False:",
+        "tests/test_dual_pipeline.py::test_text_prefers_text_layer",
+    ),
 ]
 
 
