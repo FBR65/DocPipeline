@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Test and measurement artefacts
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Third-party source document (not covered by this project's licence)
+Extract Anything From Anywhere*.pdf
+
+# Local configuration
+.env
+out/

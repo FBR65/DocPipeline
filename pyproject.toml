@@ -1,0 +1,72 @@
+[project]
+name = "docpipeline"
+version = "0.1.0"
+description = "Schema-driven field extraction from PDFs and scans: OCR (OpenAI-compatible) → chunking → GLiNER2 → dedup, as CLI and FastAPI"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "FBR65", email = "FBR65@duck.com" }
+]
+keywords = ["ocr", "document-ai", "named-entity-recognition", "gliner", "fastapi"]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "gliner2[local]>=2.1.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.16.2",
+    "pymupdf>=2.0",
+    "python-multipart>=0.0.33",
+    "typer>=0.27.3",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+docpipeline = "docpipeline:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q -m 'not integration'"
+markers = ["integration: braucht echtes OCR (llama-swap) und echtes Modell"]
+filterwarnings = [
+    "error",
+    "ignore:`torch.jit.script` is deprecated:FutureWarning",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PL", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004", "PLC0415"]
+"src/docpipeline/cli.py" = ["B008", "PLC0415"]  # typer-Optionen sind Standard-API
+"src/docpipeline/__init__.py" = ["PLC0415"]      # CLI-Import bleibt schlank
+"src/docpipeline/extractor.py" = ["PLC0415"]     # torch erst beim Laden importieren
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["gliner2.*", "fitz.*"]
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.170.14",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "pytest-randomly>=5.0.0",
+    "ruff>=0.17.3",
+]

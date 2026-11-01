@@ -1,0 +1,17 @@
+{
+  "note": "Demo-Ground-Truth, von Hand aus dem PDF gelesen.",
+  "entities": [
+    {
+      "label": "title",
+      "text": "Extract Anything From Anywhere: Building Document AI Pipeline with GLINER Beyond Zero Shot"
+    },
+    {
+      "label": "author",
+      "text": "Dhanya Shanbhag"
+    },
+    {
+      "label": "publication",
+      "text": "Towards AI"
+    }
+  ]
+}
